@@ -1,0 +1,460 @@
+<!DOCTYPE html> 
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>病院（整形外科）多言語教材 LINE風対話版</title>
+
+<script src="dialogue.js"></script>
+<script src="kanjiDict.js"></script>
+<script src="js/hanzi-writer.min.js"></script>
+
+<style>
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:#e9ece9;
+  font-family:sans-serif;
+}
+.app{
+  max-width:430px;
+  margin:0 auto;
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  background:#29423c;
+  position:relative;
+}
+header{
+  background:#0b6a2f;
+  color:#fff;
+  text-align:center;
+  padding:12px;
+  font-size:22px;
+  font-weight:bold;
+}
+#imageBox{
+  position:relative;
+  height:160px;
+  background:#a3e2b3;
+}
+#imageBox img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+}
+#overlayTitle{
+  position:absolute;
+  left:10px;
+  right:10px;
+  bottom:10px;
+  color:#fff;
+  background:rgba(0,0,0,.45);
+  border-radius:8px;
+  padding:8px;
+  text-align:center;
+  font-size:18px;
+  font-weight:bold;
+}
+.rowBtns{
+  display:flex;
+  gap:4px;
+  padding:6px;
+  background:#476d5e;
+}
+.rowBtns button{flex:1;}
+button,select{
+  border:none;
+  border-radius:6px;
+  padding:10px;
+  font-size:16px;
+  cursor:pointer;
+}
+button:hover{opacity:.92;}
+.active{background:#ffd54f !important;}
+#scriptBox{
+  flex:1;
+  overflow-y:auto;
+  padding:12px;
+  background:#204e0e;
+}
+.msg{display:flex;margin:10px 0;}
+.left{justify-content:flex-start;}
+.right{justify-content:flex-end;}
+.bubble{
+  max-width:78%;
+  padding:10px 14px;
+  border-radius:18px;
+  font-size:16px;
+  font-weight:bold;
+  line-height:1.55;
+  word-break:break-word;
+}
+.left .bubble{background:#fff;color:#111;}
+.right .bubble{background:#7dff73;color:#111;}
+.name{
+  font-size:12px;
+  color:#444;
+  margin-bottom:4px;
+  font-weight:bold;
+}
+.playRow{
+  margin-top:8px;
+  display:flex;
+  gap:6px;
+  align-items:center;
+}
+.playBtn{
+  padding:4px 8px;
+  font-size:12px;
+  background:#0b6a2f;
+  color:#fff;
+  border-radius:6px;
+}
+.speedSel{
+  padding:4px;
+  font-size:12px;
+}
+.kanji{
+  cursor:pointer;
+  color:#0057ff;
+  font-weight:bold;
+}
+
+/* モーダル */
+#kanjiModal{
+  display:none;
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:rgba(0,0,0,.65);
+  z-index:999;
+  overflow-y:auto;
+  opacity:0;
+  transition:.3s;
+}
+#kanjiModal.show{
+  display:block;
+  opacity:1;
+}
+.modalContent{
+  background:#fff8dc;
+  width:92%;
+  max-width:360px;
+  margin:30px auto;
+  padding:16px;
+  border-radius:12px;
+}
+#closeModal{
+  float:right;
+  cursor:pointer;
+  font-size:22px;
+  font-weight:bold;
+}
+.strokeBox{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:12px;
+}
+.strokeChar{
+  width:90px;
+  height:90px;
+  background:#fff;
+  border:1px solid #ccc;
+}
+#nav{
+  position:absolute;
+  top:50%;
+  left:0;
+  right:0;
+  transform:translateY(-50%);
+  display:flex;
+  justify-content:space-between;
+  padding:0 6px;
+  pointer-events:none;
+}
+#nav button{
+  pointer-events:auto;
+  width:38px;
+  height:38px;
+  border:none;
+  border-radius:50%;
+  background:rgba(0,0,0,.45);
+  color:#fff;
+  font-size:22px;
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+
+<header>病院（整形外科）多言語教材</header>
+
+<div id="imageBox">
+  <img id="img" src="picture/dialogue1.png">
+  <div id="overlayTitle">1. 初診受付</div>
+
+  <div id="nav">
+    <button onclick="prev()">❮</button>
+    <button onclick="next()">❯</button>
+  </div>
+</div>
+
+<div class="rowBtns">
+  <button onclick="setLangAll('jp')" id="btn_jp">日本語</button>
+  <button onclick="setLangAll('en')" id="btn_en">EN</button>
+  <button onclick="setLangAll('zh')" id="btn_zh">中文</button>
+  <button onclick="setLangAll('pt')" id="btn_pt">POR</button>
+  <button onclick="setLangAll('vi')" id="btn_vi">VN</button>
+</div>
+
+<div id="scriptBox"></div>
+<audio id="audio"></audio>
+
+</div>
+
+<div id="kanjiModal">
+  <div class="modalContent">
+    <span id="closeModal">×</span>
+    <div id="kanjiInfo"></div>
+  </div>
+</div>
+
+<script>
+let db = medicalData;
+
+/* =====================================================
+   中国語簡体字 → 日本語当用漢字（常用漢字）変換表
+===================================================== */
+const jpKanjiMap = {
+ "医":"医","诊":"診","疗":"療","问":"問","间":"間","关":"関",
+ "发":"発","症":"症","药":"薬","体":"体","对":"対","会":"会",
+ "气":"気","学":"学","国":"国","语":"語","话":"話","听":"聴",
+ "见":"見","处":"処","门":"門","员":"員","书":"書","车":"車",
+ "电":"電","时":"時","点":"点","来":"来","头":"頭","痛":"痛",
+ "热":"熱","检":"検","查":"査","压":"圧","张":"張","轻":"軽",
+ "边":"辺","强":"強","带":"帯","开":"開","闭":"閉","线":"線",
+ "号":"号","应":"応","实":"実","习":"習","图":"図","动":"動",
+ "务":"務","产":"産","饮":"飲","药":"薬","院":"院","师":"師",
+ "护":"護","复":"復","温":"温","湿":"湿","劳":"労","术":"術"
+};
+
+function toJapaneseKanji(text){
+  return [...text].map(ch => jpKanjiMap[ch] || ch).join("");
+}
+
+/* 漢字ラップ */
+function wrapKanji(text){
+  text = toJapaneseKanji(text);
+  return text.replace(/[\u4E00-\u9FFF]{1,4}/g,function(word){
+    return `<span class="kanji" data-kanji="${word}">${word}</span>`;
+  });
+}
+
+const images=[
+"picture/dialogue1.png","picture/dialogue2.png","picture/dialogue3.png",
+"picture/dialogue4.png","picture/dialogue5.png","picture/dialogue6.png",
+"picture/dialogue7.png","picture/dialogue8.png","picture/dialogue9.png",
+"picture/dialogue10.png"
+];
+
+let idx=0;
+let lang="jp";
+
+const audio=document.getElementById("audio");
+const scriptBox=document.getElementById("scriptBox");
+const overlayTitle=document.getElementById("overlayTitle");
+const img=document.getElementById("img");
+
+function update(){
+ const sc=db.scenarios[idx];
+
+ overlayTitle.innerText=sc.id + ". " + sc.title;
+ img.src=images[idx];
+ scriptBox.innerHTML="";
+
+ sc.dialogue.forEach((d,i)=>{
+
+   let side=d.speaker.includes("患者")?"right":"left";
+
+   let no=String(sc.id).padStart(2,"0");
+   let row=String(i+1).padStart(2,"0");
+   let file=`audio/${lang}/${no}_${row}_${d.speaker}.mp3`;
+
+   let text=(lang==="jp")
+     ? wrapKanji(d.text[lang])
+     : d.text[lang];
+
+   scriptBox.innerHTML += `
+   <div class="msg ${side}">
+     <div class="bubble">
+       <div class="name">${d.speaker}</div>
+       <div>${text}</div>
+
+       <div class="playRow">
+         <button class="playBtn" onclick="playLine('${file}',this)">▶</button>
+
+         <select class="speedSel" onchange="setLineSpeed(this)">
+           <option value="0.75">0.75x</option>
+           <option value="1" selected>1x</option>
+           <option value="1.25">1.25x</option>
+           <option value="1.5">1.5x</option>
+         </select>
+       </div>
+     </div>
+   </div>`;
+ });
+
+ mark();
+}
+
+function playLine(src,btn){
+ audio.pause();
+ audio.src=src;
+ audio.playbackRate=btn.parentElement.querySelector("select").value;
+ audio.play();
+}
+function setLineSpeed(sel){ audio.playbackRate=sel.value; }
+function setLangAll(v){ lang=v; update(); }
+
+function mark(){
+ ["jp","en","zh","pt","vi"].forEach(k=>{
+   document.getElementById("btn_"+k).classList.remove("active");
+ });
+ document.getElementById("btn_"+lang).classList.add("active");
+}
+
+function next(){ if(idx<9){idx++;update();} }
+function prev(){ if(idx>0){idx--;update();} }
+
+/* 漢字辞書 */
+function findKanjiData(word){
+
+ if(typeof kanjiDict==="undefined") return null;
+
+ if(kanjiDict[word]){
+   return [{word:word,...kanjiDict[word]}];
+ }
+
+ let results=[];
+
+ for(let key in kanjiDict){
+   if(word.includes(key)){
+     results.push({word:key,...kanjiDict[key]});
+   }
+ }
+
+ return results.length ? results : null;
+}
+
+/* モーダル表示 */
+function showKanjiInfo(word){
+
+ word = toJapaneseKanji(word);
+
+ let html=`<div class="strokeBox" id="strokeArea"></div>`;
+
+ const dataList=findKanjiData(word);
+
+ if(dataList){
+   dataList.forEach(d=>{
+     html += `
+     <div style="margin-bottom:12px;">
+       <div style="font-size:28px;font-weight:bold;">
+         ${toJapaneseKanji(d.word)}
+         ${d.Pron ? "（"+d.Pron+"）" : ""}
+       </div>
+       <div>${d.Mean ? "意味："+d.Mean : ""}</div>
+       <div style="background:#eee;padding:6px;margin-top:6px;">
+         ${d.Ex ? "例："+toJapaneseKanji(d.Ex) : ""}
+       </div>
+     </div>`;
+   });
+ }
+
+ document.getElementById("kanjiInfo").innerHTML=html;
+
+ const modal=document.getElementById("kanjiModal");
+ modal.style.display="block";
+
+ setTimeout(()=>{
+   modal.classList.add("show");
+ },10);
+
+ drawStroke(word);
+}
+
+/* 書き順アニメ */
+async function drawStroke(text){
+
+ const area=document.getElementById("strokeArea");
+ area.innerHTML="";
+
+ const writers=[];
+
+ [...text].forEach((char,i)=>{
+
+   const id="char"+i;
+
+   const div=document.createElement("div");
+   div.id=id;
+   div.className="strokeChar";
+
+   area.appendChild(div);
+
+   const writer=HanziWriter.create(id,char,{
+     width:90,
+     height:90,
+     padding:5,
+     strokeAnimationSpeed:1.3,
+     delayBetweenStrokes:100,
+     strokeWidth:3,
+     strokeColor:"#222",
+     radicalColor:"#168F16",
+     showOutline:true,
+     outlineColor:"#ddd"
+   });
+
+   writers.push(writer);
+ });
+
+ for(let writer of writers){
+   await new Promise(resolve=>{
+     writer.animateCharacter({onComplete:resolve});
+   });
+   await new Promise(r=>setTimeout(r,180));
+ }
+}
+
+function closeModal(){
+ const modal=document.getElementById("kanjiModal");
+ modal.classList.remove("show");
+ setTimeout(()=>{
+   modal.style.display="none";
+ },250);
+}
+
+/* クリック処理 */
+document.addEventListener("click",function(e){
+
+ if(e.target.classList.contains("kanji")){
+   const word=e.target.dataset.kanji;
+   showKanjiInfo(word);
+ }
+
+ if(e.target.id==="kanjiModal"){
+   closeModal();
+ }
+});
+
+document.getElementById("closeModal").onclick=closeModal;
+
+update();
+</script>
+
+</body>
+</html>
